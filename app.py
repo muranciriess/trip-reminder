@@ -857,6 +857,8 @@ def sse_proxy():
 
         return Response(generate(), content_type='text/event-stream',
                         headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+    except Exception as e:
+        return jsonify({'error': str(e)}), 502
 
 
 # ── 微信消息回调（Docker 容器 → Flask） ─────────────────
