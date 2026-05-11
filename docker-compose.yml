@@ -1,0 +1,26 @@
+services:
+  web:
+    build: .
+    container_name: trip-reminder-web
+    ports:
+      - "5001:5001"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE=/app/data/trip.db
+      - BOT_BASE_URL=http://wechat-bot:3001
+      - BOT_TOKEN=trip-bot-2026
+      - SECRET_KEY=change-this-to-a-random-string
+    depends_on:
+      - wechat-bot
+    restart: always
+
+  wechat-bot:
+    image: dannicool/docker-wechatbot-webhook
+    container_name: trip-wechat-bot
+    ports:
+      - "3001:3001"
+    environment:
+      - RECVD_MSG_API=http://web:5001/api/wechat/callback
+      - LOGIN_API_TOKEN=trip-bot-2026
+    restart: always

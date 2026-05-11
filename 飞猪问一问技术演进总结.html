@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>飞猪「问一问」AI 旅行管家技术演进总结</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; }
+        .gradient-text {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .timeline-line { position: relative; }
+        .timeline-line::before {
+            content: '';
+            position: absolute;
+            left: 24px;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, #667eea, #764ba2, #f093fb);
+        }
+        .img-zoom { transition: transform 0.3s ease; cursor: zoom-in; }
+        .img-zoom:hover { transform: scale(1.02); }
+        .stat-card {
+            background: linear-gradient(135deg, rgba(102,126,234,0.1), rgba(118,75,162,0.05));
+            border: 1px solid rgba(102,126,234,0.2);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Header -->
+    <header class="relative overflow-hidden bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 text-white">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-10 left-10 w-72 h-72 bg-white rounded-full blur-3xl"></div>
+            <div class="absolute bottom-10 right-10 w-96 h-96 bg-yellow-300 rounded-full blur-3xl"></div>
+        </div>
+        <div class="relative max-w-5xl mx-auto px-6 py-16 text-center">
+            <div class="inline-block px-4 py-1.5 bg-white/20 backdrop-blur rounded-full text-sm mb-6">
+                <i class="fa fa-plane mr-1"></i> InfoQ · 飞猪技术
+            </div>
+            <h1 class="text-4xl md:text-5xl font-black leading-tight mb-4">
+                飞猪「问一问」<br>AI 旅行管家的技术演进
+            </h1>
+            <p class="text-xl text-white/80 max-w-2xl mx-auto">
+                从行程规划工具到多智能体协作的三次跃迁
+            </p>
+            <div class="mt-8 flex justify-center gap-6 text-sm text-white/70">
+                <span><i class="fa fa-user mr-1"></i> 石国伟</span>
+                <span><i class="fa fa-building mr-1"></i> 飞猪技术团队</span>
+                <span><i class="fa fa-calendar mr-1"></i> 2025</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-16">
+
+        <!-- 核心问题 -->
+        <section>
+            <div class="bg-white rounded-2xl shadow-lg p-8 card-hover">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-indigo-100 text-indigo-600 rounded-xl flex items-center justify-center">
+                        <i class="fa fa-lightbulb-o text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">起心动念：为什么需要 AI 旅行管家？</h2>
+                </div>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
+                            <p class="font-semibold text-red-700 mb-1"><i class="fa fa-times-circle mr-1"></i> 传统模式的痛点</p>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• 用户旅行决策链路极其复杂</li>
+                                <li>• 搜索引擎只能解决"点"的问题</li>
+                                <li>• 早期 AI 聊天机器人无法形成交易闭环</li>
+                            </ul>
+                        </div>
+                        <div class="bg-green-50 border-l-4 border-green-400 p-4 rounded-r-lg">
+                            <p class="font-semibold text-green-700 mb-1"><i class="fa fa-check-circle mr-1"></i> 飞猪需要的 Agent</p>
+                            <ul class="text-sm text-green-600 space-y-1">
+                                <li>• <strong>懂行</strong> — 理解旅行业务领域知识</li>
+                                <li>• <strong>能算</strong> — 实时查询价格、班次</li>
+                                <li>• <strong>能做</strong> — 完成交易闭环</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="flex items-center justify-center">
+                        <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EicuJDW34mDdgcl5ibUajY8oYJQrgJcYC5ez7vIRVicsEwDxpkEyWuw3qg/640?wx_fmt=png&from=appmsg"
+                             alt="1.0 架构图" class="rounded-xl shadow-md img-zoom w-full">
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 三次跃迁 Timeline -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">三次技术跃迁</h2>
+                <p class="text-gray-500 mt-2">从地图工具到多智能体协作</p>
+            </div>
+
+            <div class="timeline-line space-y-8 pl-4">
+                <!-- 1.0 -->
+                <div class="relative pl-14">
+                    <div class="absolute left-3 top-6 w-10 h-10 bg-blue-500 text-white rounded-full flex items-center justify-center font-black text-sm z-10 shadow-lg">1.0</div>
+                    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-3 py-1 bg-blue-100 text-blue-700 text-xs font-bold rounded-full">地图工具时代</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3">基于地图的行程规划工具</h3>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="text-sm text-gray-600 space-y-2">
+                                <p>AI 仅用于<strong>解析导入的行程信息</strong>，核心是地图展示 + 手动编排。</p>
+                                <div class="bg-yellow-50 p-3 rounded-lg">
+                                    <p class="text-yellow-700"><i class="fa fa-exclamation-triangle mr-1"></i> <strong>局限：</strong>用户操作链路长，无法自动规划，AI 参与度低</p>
+                                </div>
+                            </div>
+                            <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EicuJDW34mDdgcl5ibUajY8oYJQrgJcYC5ez7vIRVicsEwDxpkEyWuw3qg/640?wx_fmt=png&from=appmsg"
+                                 alt="1.0 架构" class="rounded-xl shadow img-zoom w-full">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2.0 -->
+                <div class="relative pl-14">
+                    <div class="absolute left-3 top-6 w-10 h-10 bg-purple-500 text-white rounded-full flex items-center justify-center font-black text-sm z-10 shadow-lg">2.0</div>
+                    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-3 py-1 bg-purple-100 text-purple-700 text-xs font-bold rounded-full">RAG 时代</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3">线路库 + 智能行程助手 (MVP)</h3>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="text-sm text-gray-600 space-y-2">
+                                <p>采用 <strong>RAG 模式</strong>：基于 Query Processing 召回关联线路，由大模型总结输出。</p>
+                                <div class="bg-gray-50 p-3 rounded-lg space-y-1">
+                                    <p><i class="fa fa-cog mr-1 text-purple-500"></i> 建设高质量线路库</p>
+                                    <p><i class="fa fa-search mr-1 text-purple-500"></i> QP 召回 → 大模型总结</p>
+                                </div>
+                                <div class="bg-red-50 p-3 rounded-lg">
+                                    <p class="text-red-600"><i class="fa fa-exclamation-circle mr-1"></i> <strong>痛点：</strong>缺少交通/酒店实时数据，结构单一，无法形成完整方案</p>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <img src="https://mmbiz.qpic.cn/sz_mmbiz_jpg/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EU8rvu4YE1cHO0NCjjodibd8AicCHBYLK59hlsYPuaWr4YQibbiaDN8ib1Gw/640?wx_fmt=jpeg&from=appmsg"
+                                     alt="线路库" class="rounded-xl shadow img-zoom w-full">
+                                <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EpJFiaQHszOp65QIftm8XHlbqw5G8J6AVNsExF9TYFKXUREwsr0UMT6w/640?wx_fmt=png&from=appmsg"
+                                     alt="2.0 链路" class="rounded-xl shadow img-zoom w-full">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 3.0 -->
+                <div class="relative pl-14">
+                    <div class="absolute left-3 top-6 w-10 h-10 bg-gradient-to-br from-pink-500 to-orange-400 text-white rounded-full flex items-center justify-center font-black text-sm z-10 shadow-lg">3.0</div>
+                    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover border-2 border-pink-100">
+                        <div class="flex items-center gap-2 mb-3">
+                            <span class="px-3 py-1 bg-gradient-to-r from-pink-100 to-orange-100 text-pink-700 text-xs font-bold rounded-full">多智能体时代</span>
+                            <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">当前版本</span>
+                        </div>
+                        <h3 class="text-xl font-bold mb-3">意图识别 Agent + N 个场景 Agent</h3>
+                        <div class="grid md:grid-cols-2 gap-4">
+                            <div class="text-sm text-gray-600 space-y-2">
+                                <p>构建 <strong>多智能体架构</strong>：一个意图识别 Agent 做路由，N 个场景 Agent（行程、交通、酒店、讲解等）协作完成任务。</p>
+                                <div class="bg-gradient-to-r from-pink-50 to-orange-50 p-3 rounded-lg space-y-1">
+                                    <p><i class="fa fa-sitemap mr-1 text-pink-500"></i> 意图识别 Agent（路由中枢）</p>
+                                    <p><i class="fa fa-map mr-1 text-pink-500"></i> 行程规划 Agent</p>
+                                    <p><i class="fa fa-train mr-1 text-pink-500"></i> 交通查询 Agent</p>
+                                    <p><i class="fa fa-hotel mr-1 text-pink-500"></i> 酒店推荐 Agent</p>
+                                    <p><i class="fa fa-microphone mr-1 text-pink-500"></i> 景点讲解 Agent</p>
+                                </div>
+                                <p class="text-pink-600 font-medium">编排方式：COT + Prompt Chaining</p>
+                            </div>
+                            <div class="space-y-3">
+                                <img src="https://mmbiz.qpic.cn/sz_mmbiz_jpg/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EZcawFyw05icL3icBBRibOGlMX4R9ITeVhSP6XrC2kZuHKXYTlBqUKa4TQ/640?wx_fmt=jpeg&from=appmsg"
+                                     alt="3.0 产品截图" class="rounded-xl shadow img-zoom w-full">
+                                <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EiaK3gNe5IJX7UnF1whOLVAmcLjib1zq1tAFz6djkCKt0Oicfz9zczRXaA/640?wx_fmt=png&from=appmsg"
+                                     alt="多智能体架构" class="rounded-xl shadow img-zoom w-full">
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 核心架构 -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">核心架构设计</h2>
+                <p class="text-gray-500 mt-2">三大关键技术模块</p>
+            </div>
+
+            <div class="space-y-6">
+                <!-- 架构总览 -->
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EtaZ8AsqBiccdFoSz36VnS9snOfY2icUddbxQvyFujS9Ekv4O6ibAt8zww/640?wx_fmt=png&from=appmsg"
+                         alt="核心架构概览" class="rounded-xl shadow-md img-zoom w-full mb-4">
+                    <p class="text-center text-sm text-gray-500">▲ 核心架构概览图</p>
+                </div>
+
+                <div class="grid md:grid-cols-3 gap-6">
+                    <!-- 意图识别 -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                        <div class="w-12 h-12 bg-blue-100 text-blue-600 rounded-xl flex items-center justify-center mb-4">
+                            <i class="fa fa-brain text-2xl">🧠</i>
+                        </div>
+                        <h3 class="font-bold text-lg mb-3">意图识别与上下文</h3>
+                        <ul class="text-sm text-gray-600 space-y-2">
+                            <li class="flex gap-2"><span class="text-blue-500 mt-0.5"><i class="fa fa-map-marker"></i></span> 结合 LBS 信息定位</li>
+                            <li class="flex gap-2"><span class="text-blue-500 mt-0.5"><i class="fa fa-home"></i></span> 常驻地 + 历史订单</li>
+                            <li class="flex gap-2"><span class="text-blue-500 mt-0.5"><i class="fa fa-pencil"></i></span> Query 改写提升精准度</li>
+                            <li class="flex gap-2"><span class="text-blue-500 mt-0.5"><i class="fa fa-scissors"></i></span> 记忆裁剪：历史消息摘要化</li>
+                        </ul>
+                    </div>
+
+                    <!-- 数据召回 -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                        <div class="w-12 h-12 bg-purple-100 text-purple-600 rounded-xl flex items-center justify-center mb-4">
+                            <i class="fa fa-database text-2xl"></i>
+                        </div>
+                        <h3 class="font-bold text-lg mb-3">数据召回演进</h3>
+                        <div class="text-sm text-gray-600 space-y-3">
+                            <div class="bg-gray-50 p-3 rounded-lg">
+                                <p class="text-red-400 line-through mb-1">2.0：QP 模式（规则召回）</p>
+                                <p class="text-green-600 font-medium">3.0：Function Call（模型自主调用）</p>
+                            </div>
+                            <p>让模型自行决定调用哪个工具，灵活性大幅提升</p>
+                        </div>
+                    </div>
+
+                    <!-- 双轮调用 -->
+                    <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                        <div class="w-12 h-12 bg-orange-100 text-orange-600 rounded-xl flex items-center justify-center mb-4">
+                            <i class="fa fa-refresh text-2xl"></i>
+                        </div>
+                        <h3 class="font-bold text-lg mb-3">双轮工具调用</h3>
+                        <div class="text-sm text-gray-600 space-y-2">
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold">1</span>
+                                <span>查线路库 → 行程骨架</span>
+                            </div>
+                            <div class="text-center text-orange-400"><i class="fa fa-arrow-down"></i></div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 bg-orange-500 text-white rounded-full flex items-center justify-center text-xs font-bold">2</span>
+                                <span>精准查交通/酒店/门票</span>
+                            </div>
+                            <div class="text-center text-orange-400"><i class="fa fa-arrow-down"></i></div>
+                            <div class="flex items-center gap-2">
+                                <span class="w-6 h-6 bg-green-500 text-white rounded-full flex items-center justify-center text-xs font-bold">✓</span>
+                                <span>合并输出完整方案</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 架构详情图 -->
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                        <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EibKiaqQbgzueznYGY1oVE3YXtNzbSuicJ4GgRlCGpMl2JtVh6vAhiaRqwg/640?wx_fmt=png&from=appmsg"
+                             alt="意图识别流程" class="rounded-xl img-zoom w-full mb-2">
+                        <p class="text-center text-sm text-gray-500">▲ 意图识别流程</p>
+                    </div>
+                    <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                        <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4E7cJ0ndkWCbiaAdFXSibBg3sa6qNveUuU1DZqxo0vhpZyhTAox5EicHsfA/640?wx_fmt=png&from=appmsg"
+                             alt="Function Call 数据召回" class="rounded-xl img-zoom w-full mb-2">
+                        <p class="text-center text-sm text-gray-500">▲ Function Call 数据召回</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                    <img src="https://mmbiz.qpic.cn/sz_mmbiz_jpg/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EMwsC66YVpUlk11QHenlLFSHBqvFZedFyBK9Jutz0Bmm4s31icrT4JvQ/640?wx_fmt=jpeg"
+                         alt="双轮工具调用" class="rounded-xl img-zoom w-full mb-2">
+                    <p class="text-center text-sm text-gray-500">▲ 双轮工具调用示意</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 交互体验优化 -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">交互体验创新</h2>
+                <p class="text-gray-500 mt-2">极致的用户体验优化</p>
+            </div>
+
+            <div class="grid md:grid-cols-3 gap-6">
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <div class="text-3xl mb-4">📡</div>
+                    <h3 class="font-bold text-lg mb-2">双通道渲染协议</h3>
+                    <div class="text-sm text-gray-600 space-y-2">
+                        <div class="flex gap-2 items-start">
+                            <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded font-mono shrink-0">文本流</span>
+                            <span>流式 Markdown 实时输出</span>
+                        </div>
+                        <div class="flex gap-2 items-start">
+                            <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded font-mono shrink-0">卡片流</span>
+                            <span>XML 占位符 → 异步推送结构化数据</span>
+                        </div>
+                        <p class="text-purple-600">实现图文混排流式输出</p>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <div class="text-3xl mb-4">⚡</div>
+                    <h3 class="font-bold text-lg mb-2">极致并行处理</h3>
+                    <p class="text-sm text-gray-600">无依赖关系的内容全部<strong>并行生成</strong>，多个 Agent 同时工作，大幅缩短用户等待时间。</p>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <div class="text-3xl mb-4">🔄</div>
+                    <h3 class="font-bold text-lg mb-2">弱网断点续传</h3>
+                    <p class="text-sm text-gray-600">创新的<strong>序号化续接机制</strong>：网络中断后恢复，从断点位置继续下发内容，不丢失也不重复。</p>
+                </div>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 mt-6">
+                <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                    <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4EP1ibA6F9QJSgsrQ0t2stBURB4qxOy30j4kAEZibhvLIHQ2OZ0xvsF9Ag/640?wx_fmt=png&from=appmsg"
+                         alt="双通道渲染" class="rounded-xl img-zoom w-full mb-2">
+                    <p class="text-center text-sm text-gray-500">▲ 双通道渲染协议</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                    <img src="https://mmbiz.qpic.cn/sz_mmbiz_png/YriaiaJPb26VOYdOSj1Tbt3N6hFrVtsj4Eq943qoBibwNBiapo0nQYz3AenUc5ic3ZFI8bu8rEoiaU3CgJ7xxTAkQ7CA/640?wx_fmt=png&from=appmsg"
+                         alt="断点续传" class="rounded-xl img-zoom w-full mb-2">
+                    <p class="text-center text-sm text-gray-500">▲ 弱网断点续传机制</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- 实战成果 -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">实战成果</h2>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div class="stat-card rounded-2xl p-6 text-center card-hover">
+                    <div class="text-4xl font-black text-indigo-600 mb-2">90%<span class="text-lg">+</span></div>
+                    <p class="text-sm text-gray-600">行程规划效率提升</p>
+                </div>
+                <div class="stat-card rounded-2xl p-6 text-center card-hover">
+                    <div class="text-4xl font-black text-purple-600 mb-2">95%</div>
+                    <p class="text-sm text-gray-600">用户满意度</p>
+                </div>
+                <div class="stat-card rounded-2xl p-6 text-center card-hover">
+                    <div class="text-4xl font-black text-pink-600 mb-2">¥50</div>
+                    <p class="text-sm text-gray-600">拍照讲解平均节省</p>
+                </div>
+                <div class="stat-card rounded-2xl p-6 text-center card-hover">
+                    <div class="text-4xl font-black text-orange-600 mb-2">N+</div>
+                    <p class="text-sm text-gray-600">手机厂商接入</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-lg p-6 mt-6 card-hover">
+                <h3 class="font-bold text-lg mb-3"><i class="fa fa-handshake-o mr-2 text-indigo-500"></i>生态合作</h3>
+                <p class="text-sm text-gray-600">已接入 <strong>荣耀 YOYO</strong>、<strong>VIVO 蓝心小 V</strong> 等手机厂商智能体生态，将 AI 旅行管家能力输出到更多终端。</p>
+            </div>
+        </section>
+
+        <!-- 核心结论 -->
+        <section>
+            <div class="bg-gradient-to-br from-indigo-600 via-purple-600 to-pink-500 rounded-2xl shadow-xl p-8 text-white">
+                <div class="text-center mb-6">
+                    <div class="text-3xl mb-3">💡</div>
+                    <h2 class="text-2xl font-black">核心结论</h2>
+                </div>
+                <div class="max-w-3xl mx-auto">
+                    <blockquote class="text-xl text-center leading-relaxed font-medium mb-6">
+                        "AI Agent 的核心不在于 Prompt，<br>而在于<span class="text-yellow-300 font-black">上下文工程（Context Engineering）</span>"
+                    </blockquote>
+                    <div class="grid md:grid-cols-2 gap-4">
+                        <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                            <p class="font-bold mb-1"><i class="fa fa-database mr-1"></i> 高质量行业数据</p>
+                            <p class="text-sm text-white/80">给模型提供领域专有的、结构化的数据，而非通用知识</p>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur rounded-xl p-4">
+                            <p class="font-bold mb-1"><i class="fa fa-wrench mr-1"></i> 真实世界工具能力</p>
+                            <p class="text-sm text-white/80">让 Agent 具备调用实时交通、酒店、门票等真实服务的能力</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-8 mt-16">
+        <div class="max-w-5xl mx-auto px-6 text-center text-sm">
+            <p>内容来源：InfoQ · 飞猪技术 · 石国伟</p>
+            <p class="mt-1 text-gray-600">本页面仅为文章内容的结构化总结</p>
+        </div>
+    </footer>
+
+</body>
+</html>

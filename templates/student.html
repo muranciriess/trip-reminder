@@ -1,0 +1,350 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行程提醒</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        card: { bg: '#1a1a2e', header: '#16213e', accent: '#e94560' }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        [x-cloak] { display: none !important; }
+        body { background: #0f0f23; }
+        .card-glow { box-shadow: 0 0 30px rgba(233, 69, 96, 0.08), 0 4px 20px rgba(0,0,0,0.3); }
+        .checklist-done { text-decoration: line-through; opacity: 0.6; }
+        @keyframes checkPop {
+            0% { transform: scale(1); }
+            50% { transform: scale(1.3); }
+            100% { transform: scale(1); }
+        }
+        .check-pop { animation: checkPop 0.3s ease; }
+    </style>
+</head>
+<body class="min-h-screen text-gray-100">
+    <!-- 顶部导航 -->
+    <nav class="sticky top-0 z-40 bg-[#0f0f23]/90 backdrop-blur-md border-b border-white/5 px-4 py-3">
+        <div class="max-w-lg mx-auto flex items-center justify-between">
+            <a href="{{ url_for('index') }}" class="text-base font-bold text-white hover:text-gray-300 transition">📋 行程提醒</a>
+        </div>
+    </nav>
+
+    <div class="max-w-lg mx-auto px-4 py-6 space-y-6">
+        {% if not trip_data %}
+        <div class="text-center py-20">
+            <div class="text-5xl mb-4">🎉</div>
+            <p class="text-gray-400">暂无即将到来的行程安排</p>
+            <p class="text-gray-600 text-sm mt-2">放松一下吧～</p>
+        </div>
+        {% endif %}
+
+        {% for td in trip_data %}
+        {% set trip = td.trip %}
+        {% set checklist = td.checklist %}
+        {% set events = td.events %}
+        {% set trip_date_obj = trip['trip_date'] %}
+
+        <div class="rounded-2xl overflow-hidden card-glow bg-[#1a1a2e]"
+             x-data="checklistCard_{{ trip['id'] }}()">
+
+            <!-- 日期头部 -->
+            <div class="bg-gradient-to-r from-[#16213e] to-[#1a1a3e] px-5 py-4 border-b border-white/5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">{% if trip['trip_date'] == today %}☀️{% else %}🌙{% endif %}</span>
+                        <div>
+                            <div class="text-white font-bold">
+                                {{ trip['trip_date'][5:7] | int }}月{{ trip['trip_date'][8:10] | int }}日
+                            </div>
+                            <div class="text-gray-400 text-xs mt-0.5">
+                                {% if trip['trip_date'] == today %}今日安排{% else %}行程提醒{% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    <div class="text-gray-500">
+                        <i class="fa fa-clone"></i>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 space-y-4">
+
+                {% if trip['mode'] == 'freeform' %}
+                <!-- 自由编辑内容 -->
+                {% if trip['custom_content'] %}
+                <div class="text-sm text-gray-200 whitespace-pre-wrap leading-relaxed">{{ trip['custom_content'] }}</div>
+                {% endif %}
+                {% else %}
+                <!-- 行程标题 -->
+                <div class="flex items-center gap-2">
+                    <span class="text-lg">📅</span>
+                    <span class="font-bold text-white">
+                        {% if trip['trip_date'] == today %}今日安排{% else %}{{ trip['trip_date'][5:7] | int }}月{{ trip['trip_date'][8:10] | int }}日安排{% endif %}
+                    </span>
+                </div>
+
+                <div class="h-px bg-gradient-to-r from-indigo-500/50 to-transparent"></div>
+
+                <!-- 时间和行程 -->
+                <div class="space-y-2">
+                    <div class="flex items-start gap-3">
+                        <span class="text-lg mt-0.5">🍅</span>
+                        <div>
+                            <div class="text-white font-medium">
+                                {% if trip['time_start'] %}
+                                {{ trip['time_start'] }}{% if trip['time_end'] %}-{{ trip['time_end'] }}{% endif %}
+                                {% endif %}
+                                {{ trip['title'] }}
+                            </div>
+
+                            {% if trip['location_from'] or trip['location_to'] %}
+                            <div class="text-gray-300 text-sm mt-1.5 flex items-center gap-2">
+                                <span>✈️</span>
+                                {% if trip['location_from'] and trip['location_to'] %}
+                                <span>{{ trip['location_from'] }} → {{ trip['location_to'] }}</span>
+                                {% elif trip['location_to'] %}
+                                <span>📍 {{ trip['location_to'] }}</span>
+                                {% else %}
+                                <span>📍 {{ trip['location_from'] }}</span>
+                                {% endif %}
+                            </div>
+                            {% endif %}
+
+                            {% if trip['personnel'] %}
+                            <div class="text-gray-300 text-sm mt-1 flex items-center gap-2">
+                                <span>👥</span>
+                                <span>{{ trip['personnel'] }}</span>
+                            </div>
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 天气 -->
+                {% if trip['weather'] %}
+                <div class="bg-[#16213e]/60 rounded-xl px-4 py-3 mt-3">
+                    <div class="flex items-start gap-2">
+                        <span class="text-lg">🌤</span>
+                        <div class="text-sm text-gray-300">
+                            <div>{{ trip['weather'] }}</div>
+                            {% if trip['notes'] %}
+                            {% for line in trip['notes'].split('\n') %}
+                            {% if line.strip() %}
+                            <div class="text-gray-400 mt-1">{{ line.strip() }}</div>
+                            {% endif %}
+                            {% endfor %}
+                            {% endif %}
+                        </div>
+                    </div>
+                </div>
+                {% elif trip['notes'] %}
+                <div class="bg-[#16213e]/60 rounded-xl px-4 py-3 mt-3">
+                    <div class="text-sm text-gray-400">
+                        {% for line in trip['notes'].split('\n') %}
+                        {% if line.strip() %}
+                        <div>{{ line.strip() }}</div>
+                        {% endif %}
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+                {% endif %}
+
+                <!-- 准备检查清单 -->
+                {% if checklist %}
+                <div class="mt-4">
+                    <div class="flex items-center justify-between mb-3">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">⚠️</span>
+                            <span class="font-bold text-amber-400">准备检查</span>
+                        </div>
+                        <div class="text-xs text-gray-500">
+                            <span x-text="doneCount">0</span>/<span x-text="totalCount">{{ checklist | length }}</span> 已完成
+                        </div>
+                    </div>
+
+                    <!-- 进度条 -->
+                    <div class="w-full bg-gray-700/50 rounded-full h-1.5 mb-3">
+                        <div class="bg-gradient-to-r from-amber-500 to-green-500 h-1.5 rounded-full transition-all duration-500"
+                             :style="'width:' + (totalCount ? (doneCount/totalCount*100) : 0) + '%'"></div>
+                    </div>
+
+                    <div class="space-y-2">
+                        {% for item in checklist %}
+                        <div class="flex items-center gap-3 group cursor-pointer rounded-lg px-3 py-2 hover:bg-white/5 transition"
+                             @click="toggle({{ item['id'] }}, {{ loop.index0 }})">
+                            <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200 shrink-0"
+                                 :class="items[{{ loop.index0 }}].checked ? 'bg-green-500 border-green-500' : 'border-gray-500 hover:border-amber-400'">
+                                <i class="fa fa-check text-white text-xs" x-show="items[{{ loop.index0 }}].checked" x-cloak></i>
+                            </div>
+                            <span class="text-xs text-gray-500 shrink-0">{{ loop.index }}.</span>
+                            <span class="text-sm transition-all duration-200"
+                                  :class="items[{{ loop.index0 }}].checked ? 'text-gray-500 line-through' : 'text-gray-200'">
+                                {{ item['content'] }}
+                            </span>
+                            <span class="text-xs text-gray-600 ml-auto opacity-0 group-hover:opacity-100 transition"
+                                  x-show="items[{{ loop.index0 }}].checked" x-cloak
+                                  x-text="items[{{ loop.index0 }}].checked_by + ' ' + items[{{ loop.index0 }}].checked_at"></span>
+                        </div>
+                        {% endfor %}
+                    </div>
+
+                    <div class="mt-3 text-xs text-gray-600 bg-white/5 rounded-lg px-3 py-2">
+                        💬 群内回复「打卡 序号」即可完成对应项目
+                    </div>
+                </div>
+                {% endif %}
+
+                <!-- 本周后续 -->
+                {% if events %}
+                <div class="mt-4 pt-4 border-t border-white/5">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="text-lg">📅</span>
+                        <span class="font-bold text-white">本周后续</span>
+                    </div>
+                    <div class="space-y-2 pl-1">
+                        {% for ev in events %}
+                        <div class="text-sm text-gray-300 flex items-start gap-3">
+                            <span class="text-gray-500 whitespace-nowrap">
+                                {{ ev['event_date'][5:7] | int }}/{{ ev['event_date'][8:10] | int }}
+                                {% if ev['event_time'] %}{{ ev['event_time'] }}{% endif %}
+                            </span>
+                            <span>{{ ev['event_title'] }}</span>
+                            {% if ev['event_note'] %}
+                            <span class="text-amber-400 text-xs">{{ ev['event_note'] }}</span>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                {% endif %}
+            </div>
+        </div>
+
+        <script>
+        function checklistCard_{{ trip['id'] }}() {
+            return {
+                items: [
+                    {% for item in checklist %}
+                    { id: {{ item['id'] }}, checked: {{ 'true' if item['checked'] else 'false' }}, checked_at: {{ (item['checked_at'] or '') | tojson }} },
+                    {% endfor %}
+                ],
+                get totalCount() { return this.items.length; },
+                get doneCount() { return this.items.filter(i => i.checked).length; },
+
+                async toggle(itemId, index) {
+                    try {
+                        const res = await fetch(`/api/checklist/${itemId}/toggle`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: '学员' })
+                        });
+                        const data = await res.json();
+                        this.items[index].checked = data.checked;
+                        this.items[index].checked_at = data.checked_at || '';
+                    } catch (e) {
+                        console.error('Toggle failed:', e);
+                    }
+                }
+            }
+        }
+        </script>
+        {% endfor %}
+
+        <!-- 每日任务 -->
+        {% for dd in daily_data %}
+        {% set dtask = dd.task %}
+        {% set ditems = dd.items %}
+        {% set checkin_set = dd.checkin_set %}
+
+        <div class="rounded-2xl overflow-hidden card-glow bg-[#1a1a2e]"
+             x-data="dailyCard_{{ dtask['id'] }}()">
+
+            <div class="bg-gradient-to-r from-[#1e3a2e] to-[#1a2a3e] px-5 py-4 border-b border-white/5">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-2">
+                        <span class="text-2xl">📝</span>
+                        <div>
+                            <div class="text-white font-bold">{{ dtask['title'] }}</div>
+                            <div class="text-gray-400 text-xs mt-0.5">每日任务 · 每天 {{ dtask['remind_time'] }} 提醒</div>
+                        </div>
+                    </div>
+                    <div class="text-xs text-gray-500">
+                        <span x-text="doneCount">0</span>/<span x-text="totalCount">{{ ditems | length }}</span>
+                    </div>
+                </div>
+            </div>
+
+            <div class="px-5 py-4 space-y-1">
+                <div class="w-full bg-gray-700/50 rounded-full h-1.5 mb-3">
+                    <div class="bg-gradient-to-r from-green-500 to-emerald-400 h-1.5 rounded-full transition-all duration-500"
+                         :style="'width:' + (totalCount ? (doneCount/totalCount*100) : 0) + '%'"></div>
+                </div>
+
+                {% for item in ditems %}
+                <div class="flex items-center gap-3 group cursor-pointer rounded-lg px-3 py-2 hover:bg-white/5 transition"
+                     @click="toggle({{ item['id'] }}, {{ loop.index0 }})">
+                    <div class="w-5 h-5 rounded border-2 flex items-center justify-center transition-all duration-200 shrink-0"
+                         :class="items[{{ loop.index0 }}].checked ? 'bg-green-500 border-green-500' : 'border-gray-500 hover:border-green-400'">
+                        <i class="fa fa-check text-white text-xs" x-show="items[{{ loop.index0 }}].checked" x-cloak></i>
+                    </div>
+                    <span class="text-xs text-gray-500 shrink-0">{{ loop.index }}.</span>
+                    <span class="text-sm transition-all duration-200"
+                          :class="items[{{ loop.index0 }}].checked ? 'text-gray-500 line-through' : 'text-gray-200'">
+                        {{ item['content'] }}
+                    </span>
+                </div>
+                {% endfor %}
+
+                <div class="mt-3 text-xs text-gray-600 bg-white/5 rounded-lg px-3 py-2">
+                    💬 群内回复「每日打卡 序号」即可完成对应任务
+                </div>
+            </div>
+        </div>
+
+        <script>
+        function dailyCard_{{ dtask['id'] }}() {
+            return {
+                items: [
+                    {% for item in ditems %}
+                    { id: {{ item['id'] }}, checked: {{ 'true' if item['id'] in checkin_set else 'false' }} },
+                    {% endfor %}
+                ],
+                get totalCount() { return this.items.length; },
+                get doneCount() { return this.items.filter(i => i.checked).length; },
+
+                async toggle(itemId, index) {
+                    try {
+                        const res = await fetch(`/api/daily/checkin/${itemId}/toggle`, {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({ name: '学员' })
+                        });
+                        const data = await res.json();
+                        this.items[index].checked = data.checked;
+                    } catch (e) {
+                        console.error('Toggle failed:', e);
+                    }
+                }
+            }
+        }
+        </script>
+        {% endfor %}
+    </div>
+
+    <!-- 底部 -->
+    <div class="max-w-lg mx-auto px-4 py-8 text-center">
+        <p class="text-gray-700 text-xs">提醒管理系统</p>
+    </div>
+</body>
+</html>

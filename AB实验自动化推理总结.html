@@ -1,0 +1,583 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>生产级 Prompt 自动化推理评估 A/B 实验结果</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Noto+Sans+SC:wght@300;400;500;700;900&display=swap');
+        body { font-family: 'Noto Sans SC', sans-serif; }
+        .gradient-text {
+            background: linear-gradient(135deg, #0ea5e9 0%, #6366f1 50%, #a855f7 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .card-hover { transition: all 0.3s ease; }
+        .card-hover:hover { transform: translateY(-4px); box-shadow: 0 20px 40px rgba(0,0,0,0.1); }
+        .img-zoom { transition: transform 0.3s ease; cursor: zoom-in; }
+        .img-zoom:hover { transform: scale(1.02); }
+        .level-bar { position: relative; padding-left: 3rem; }
+        .level-bar::before {
+            content: '';
+            position: absolute;
+            left: 1.1rem;
+            top: 0;
+            bottom: 0;
+            width: 3px;
+            background: linear-gradient(to bottom, #ef4444, #f97316, #eab308, #22c55e, #3b82f6, #8b5cf6, #6b7280);
+        }
+        .level-dot {
+            position: absolute;
+            left: 0;
+            top: 1.25rem;
+            width: 2.4rem;
+            height: 2.4rem;
+            border-radius: 9999px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 900;
+            font-size: 0.75rem;
+            color: white;
+            z-index: 10;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+        }
+        .glow-border {
+            box-shadow: 0 0 0 1px rgba(99,102,241,0.1), 0 4px 24px rgba(99,102,241,0.08);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 text-gray-800">
+
+    <!-- Header -->
+    <header class="relative overflow-hidden bg-gradient-to-br from-sky-600 via-indigo-600 to-purple-700 text-white">
+        <div class="absolute inset-0 opacity-10">
+            <div class="absolute top-10 right-20 w-80 h-80 bg-cyan-300 rounded-full blur-3xl"></div>
+            <div class="absolute bottom-0 left-10 w-96 h-96 bg-purple-300 rounded-full blur-3xl"></div>
+        </div>
+        <div class="relative max-w-5xl mx-auto px-6 py-16 text-center">
+            <div class="inline-block px-4 py-1.5 bg-white/20 backdrop-blur rounded-full text-sm mb-6">
+                <i class="fa fa-flask mr-1"></i> 阿里云开发者 · 码影（张超）
+            </div>
+            <h1 class="text-3xl md:text-5xl font-black leading-tight mb-4">
+                生产级 Prompt<br>自动化推理评估 A/B 实验结果
+            </h1>
+            <p class="text-lg text-white/80 max-w-2xl mx-auto">
+                用 LLM 六层决策树替代人工巡检，从 6 小时/天降至 30 分钟/天
+            </p>
+            <div class="mt-8 flex flex-wrap justify-center gap-4 text-sm">
+                <span class="px-3 py-1 bg-white/15 backdrop-blur rounded-full"><i class="fa fa-cog mr-1"></i> DeepSeek-R1</span>
+                <span class="px-3 py-1 bg-white/15 backdrop-blur rounded-full"><i class="fa fa-cog mr-1"></i> Qwen3-Max</span>
+                <span class="px-3 py-1 bg-white/15 backdrop-blur rounded-full"><i class="fa fa-line-chart mr-1"></i> A/B 实验</span>
+                <span class="px-3 py-1 bg-white/15 backdrop-blur rounded-full"><i class="fa fa-code mr-1"></i> Prompt Engineering</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-5xl mx-auto px-6 py-12 space-y-16">
+
+        <!-- 问题背景 -->
+        <section>
+            <div class="bg-white rounded-2xl shadow-lg p-8 card-hover">
+                <div class="flex items-center gap-3 mb-6">
+                    <div class="w-10 h-10 bg-red-100 text-red-600 rounded-xl flex items-center justify-center">
+                        <i class="fa fa-exclamation-triangle text-xl"></i>
+                    </div>
+                    <h2 class="text-2xl font-bold">业务痛点：人工巡检不可持续</h2>
+                </div>
+                <div class="grid md:grid-cols-2 gap-6">
+                    <div class="space-y-4">
+                        <div class="bg-red-50 border-l-4 border-red-400 p-4 rounded-r-lg">
+                            <p class="font-semibold text-red-700 mb-2"><i class="fa fa-times-circle mr-1"></i> 竞价策略实验困境</p>
+                            <ul class="text-sm text-red-600 space-y-1">
+                                <li>• 每日 300+ 策略实验并行运行</li>
+                                <li>• 人工巡检耗时 <strong>6 小时/天</strong></li>
+                                <li>• 判断标准不一致、易遗漏</li>
+                                <li>• 负向策略下线不及时造成损失</li>
+                            </ul>
+                        </div>
+                        <div class="bg-orange-50 border-l-4 border-orange-400 p-4 rounded-r-lg">
+                            <p class="font-semibold text-orange-700 mb-2"><i class="fa fa-eye mr-1"></i> 打包留白实验困境</p>
+                            <ul class="text-sm text-orange-600 space-y-1">
+                                <li>• 需同时关注端视角 + 行业视角</li>
+                                <li>• 数据维度多、交叉判断复杂</li>
+                                <li>• 人力资源严重不足</li>
+                            </ul>
+                        </div>
+                    </div>
+                    <div class="space-y-3">
+                        <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naLQLqYDblBuNLRt4H3CliarDqA5jX0dYY0NajibDLqqyyrt3zXPyDWGr3XLMdbuOmSKRrTP7Kiam0ITA/640?wx_fmt=png&from=appmsg"
+                             alt="竞价策略实验困境" class="rounded-xl shadow-md img-zoom w-full">
+                        <p class="text-center text-xs text-gray-400">▲ 竞价策略实验困境流程</p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 现有方案局限 vs 新方案 -->
+        <section>
+            <div class="grid md:grid-cols-2 gap-6">
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <h3 class="font-bold text-lg mb-4 text-red-600"><i class="fa fa-ban mr-2"></i>现有方案的局限</h3>
+                    <div class="space-y-3 text-sm text-gray-600">
+                        <div class="bg-gray-50 p-3 rounded-lg flex gap-3 items-start">
+                            <span class="text-red-400 mt-0.5"><i class="fa fa-times"></i></span>
+                            <span><strong>固定规则</strong>：只能处理简单阈值判断，无法理解趋势</span>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg flex gap-3 items-start">
+                            <span class="text-red-400 mt-0.5"><i class="fa fa-times"></i></span>
+                            <span><strong>人工判断</strong>：标准不一致，依赖个人经验</span>
+                        </div>
+                        <div class="bg-gray-50 p-3 rounded-lg flex gap-3 items-start">
+                            <span class="text-red-400 mt-0.5"><i class="fa fa-times"></i></span>
+                            <span><strong>无法规模化</strong>：300+ 实验人力不可能覆盖</span>
+                        </div>
+                    </div>
+                    <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naLQLqYDblBuNLRt4H3CliarD5NAs78mHbwicnYImqWRZBpxgtGRRIOHeuzZg6AvLwtUicsCvjws66k4g/640?wx_fmt=png&from=appmsg"
+                         alt="现有方案局限" class="rounded-xl shadow img-zoom w-full mt-4">
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover border-2 border-green-100">
+                    <h3 class="font-bold text-lg mb-4 text-green-600"><i class="fa fa-check-circle mr-2"></i>LLM 推理方案</h3>
+                    <div class="space-y-3 text-sm text-gray-600">
+                        <div class="bg-green-50 p-3 rounded-lg flex gap-3 items-start">
+                            <span class="text-green-500 mt-0.5"><i class="fa fa-check"></i></span>
+                            <span><strong>理解趋势</strong>：大模型能分析时序变化、加速度</span>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg flex gap-3 items-start">
+                            <span class="text-green-500 mt-0.5"><i class="fa fa-check"></i></span>
+                            <span><strong>标准统一</strong>：Prompt 定义决策逻辑，结果可复现</span>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg flex gap-3 items-start">
+                            <span class="text-green-500 mt-0.5"><i class="fa fa-check"></i></span>
+                            <span><strong>自动化</strong>：7×24 全量巡检，无人力瓶颈</span>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg flex gap-3 items-start">
+                            <span class="text-green-500 mt-0.5"><i class="fa fa-check"></i></span>
+                            <span><strong>可解释</strong>：输出决策依据，便于追溯和迭代</span>
+                        </div>
+                    </div>
+                    <div class="mt-4 bg-indigo-50 p-3 rounded-lg text-center">
+                        <p class="text-indigo-700 font-medium text-sm">模型选型：<strong>DeepSeek-R1-0528</strong> / <strong>Qwen3-Max</strong></p>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 系统工作流 -->
+        <section>
+            <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                <h2 class="text-2xl font-bold mb-6 text-center gradient-text">系统自动化工作流</h2>
+                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
+                    <div class="text-center">
+                        <img src="https://mmbiz.qpic.cn/mmbiz/Z6bicxIx5naL9Dr7oLH85FMDI7ImRYhdPqR935MAViaZrWH9jmVZLj0f3te6hzqSfSqwCxAsVDBcYz8D8oRicB1ww/640?wx_fmt=other&from=appmsg"
+                             alt="同步数据-开始" class="rounded-xl shadow img-zoom w-full mb-2">
+                        <p class="text-xs text-gray-500">同步实验数据（开始）</p>
+                    </div>
+                    <div class="text-center">
+                        <img src="https://mmbiz.qpic.cn/mmbiz/Z6bicxIx5naL9Dr7oLH85FMDI7ImRYhdPpIel9DBQiaUuXU2VJiaILc9M4iaM16jlHrLfxDwq1ktQC26ZROSzZFWLQ/640?wx_fmt=other&from=appmsg"
+                             alt="同步数据-完成" class="rounded-xl shadow img-zoom w-full mb-2">
+                        <p class="text-xs text-gray-500">同步实验数据（完成）</p>
+                    </div>
+                    <div class="text-center">
+                        <img src="https://mmbiz.qpic.cn/mmbiz/Z6bicxIx5naL9Dr7oLH85FMDI7ImRYhdPmpmRO0mkiakKROKjEMFjEe2CKiajt2tJbic0QoyQrb5qL78lPoH6CW9ew/640?wx_fmt=other&from=appmsg"
+                             alt="推理-开始" class="rounded-xl shadow img-zoom w-full mb-2">
+                        <p class="text-xs text-gray-500">自动推理（开始）</p>
+                    </div>
+                    <div class="text-center">
+                        <img src="https://mmbiz.qpic.cn/mmbiz/Z6bicxIx5naL9Dr7oLH85FMDI7ImRYhdPCbdcZ9qjibgWhCJCVqLIqVI7lDsSIibe9WspDy4NhIvS5OJjJUiccKibEQ/640?wx_fmt=other&from=appmsg"
+                             alt="推理-结束" class="rounded-xl shadow img-zoom w-full mb-2">
+                        <p class="text-xs text-gray-500">自动推理（结束）</p>
+                    </div>
+                </div>
+                <div class="flex items-center justify-center gap-2 text-sm text-gray-500">
+                    <span class="px-3 py-1 bg-sky-100 text-sky-700 rounded-full font-medium">数据同步</span>
+                    <i class="fa fa-arrow-right text-gray-300"></i>
+                    <span class="px-3 py-1 bg-indigo-100 text-indigo-700 rounded-full font-medium">LLM 推理</span>
+                    <i class="fa fa-arrow-right text-gray-300"></i>
+                    <span class="px-3 py-1 bg-purple-100 text-purple-700 rounded-full font-medium">决策输出</span>
+                    <i class="fa fa-arrow-right text-gray-300"></i>
+                    <span class="px-3 py-1 bg-green-100 text-green-700 rounded-full font-medium">人工复核</span>
+                </div>
+            </div>
+        </section>
+
+        <!-- 六层决策树 -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">六层优先级决策树</h2>
+                <p class="text-gray-500 mt-2">按风险严重程度分层判断，高优先级先决策</p>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-lg p-6 card-hover mb-6">
+                <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naLQLqYDblBuNLRt4H3CliarDDN5HJkiaM61HsiaiaPIGTFOZWvCxUCqJ1w0xm1dkjYIiahdj8WeiaicAYT2w/640?wx_fmt=png&from=appmsg"
+                     alt="优先级分层机制" class="rounded-xl shadow-md img-zoom w-full mb-3">
+                <p class="text-center text-sm text-gray-500">▲ 六层优先级分层决策机制全景</p>
+            </div>
+
+            <div class="level-bar space-y-5">
+                <!-- L0 -->
+                <div class="relative bg-white rounded-2xl shadow-lg p-5 pl-6 card-hover glow-border">
+                    <div class="level-dot bg-gray-500">L0</div>
+                    <div class="flex flex-col md:flex-row md:items-start gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="font-bold text-lg">数据不足的保守决策</h3>
+                                <span class="px-2 py-0.5 bg-gray-100 text-gray-600 text-xs rounded-full">前置校验</span>
+                            </div>
+                            <p class="text-sm text-gray-600">实验天数 < 3 天或数据点不足时，<strong>直接输出"继续观察"</strong>，不做任何推理判断。避免在数据不充分时产生误判。</p>
+                        </div>
+                        <div class="shrink-0 w-20 h-20 bg-gray-100 rounded-xl flex flex-col items-center justify-center">
+                            <i class="fa fa-hourglass-half text-2xl text-gray-400"></i>
+                            <span class="text-xs text-gray-500 mt-1">等待</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- L1 -->
+                <div class="relative bg-white rounded-2xl shadow-lg p-5 pl-6 card-hover glow-border">
+                    <div class="level-dot bg-red-600">L1</div>
+                    <div class="flex flex-col md:flex-row md:items-start gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="font-bold text-lg">连续负向</h3>
+                                <span class="px-2 py-0.5 bg-red-100 text-red-700 text-xs rounded-full font-bold">最严格下线信号</span>
+                            </div>
+                            <p class="text-sm text-gray-600">核心指标连续多日为负，说明策略持续损害业务。这是最高优先级的下线信号，一旦触发立即建议下线。</p>
+                        </div>
+                        <div class="shrink-0 w-20 h-20 bg-red-50 rounded-xl flex flex-col items-center justify-center">
+                            <i class="fa fa-arrow-down text-2xl text-red-500"></i>
+                            <span class="text-xs text-red-500 mt-1 font-bold">下线</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- L2 -->
+                <div class="relative bg-white rounded-2xl shadow-lg p-5 pl-6 card-hover glow-border">
+                    <div class="level-dot bg-orange-500">L2</div>
+                    <div class="flex flex-col md:flex-row md:items-start gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="font-bold text-lg">趋势恶化</h3>
+                                <span class="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full">加速度负向</span>
+                            </div>
+                            <p class="text-sm text-gray-600">虽然不是全程为负，但指标的<strong>变化加速度为负</strong>——恶化在加速。不等指标全面转负就预警下线。</p>
+                        </div>
+                        <div class="shrink-0 w-20 h-20 bg-orange-50 rounded-xl flex flex-col items-center justify-center">
+                            <i class="fa fa-line-chart text-2xl text-orange-500" style="transform: scaleY(-1)"></i>
+                            <span class="text-xs text-orange-500 mt-1">加速恶化</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- L3 -->
+                <div class="relative bg-white rounded-2xl shadow-lg p-5 pl-6 card-hover glow-border">
+                    <div class="level-dot bg-yellow-500">L3</div>
+                    <div class="flex flex-col md:flex-row md:items-start gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="font-bold text-lg">负向转正失败</h3>
+                                <span class="px-2 py-0.5 bg-yellow-100 text-yellow-700 text-xs rounded-full">虚假反弹陷阱</span>
+                            </div>
+                            <p class="text-sm text-gray-600">策略一度从负转正，但<strong>反弹未能持续</strong>，重新跌回负向。识别"虚假反弹"，避免被短期好转迷惑。</p>
+                        </div>
+                        <div class="shrink-0 w-20 h-20 bg-yellow-50 rounded-xl flex flex-col items-center justify-center">
+                            <i class="fa fa-refresh text-2xl text-yellow-500"></i>
+                            <span class="text-xs text-yellow-600 mt-1">假反弹</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- L4 -->
+                <div class="relative bg-white rounded-2xl shadow-lg p-5 pl-6 card-hover glow-border">
+                    <div class="level-dot bg-green-500">L4</div>
+                    <div class="flex flex-col md:flex-row md:items-start gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="font-bold text-lg">正向衰减</h3>
+                                <span class="px-2 py-0.5 bg-green-100 text-green-700 text-xs rounded-full">增益消失信号</span>
+                            </div>
+                            <p class="text-sm text-gray-600">策略曾经正向有效，但增益在<strong>逐渐衰减</strong>。如果衰减趋势明确，提前预警，避免增益耗尽后才发现。</p>
+                        </div>
+                        <div class="shrink-0 w-20 h-20 bg-green-50 rounded-xl flex flex-col items-center justify-center">
+                            <i class="fa fa-battery-quarter text-2xl text-green-500"></i>
+                            <span class="text-xs text-green-600 mt-1">增益衰减</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- L5 -->
+                <div class="relative bg-white rounded-2xl shadow-lg p-5 pl-6 card-hover glow-border">
+                    <div class="level-dot bg-blue-500">L5</div>
+                    <div class="flex flex-col md:flex-row md:items-start gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="font-bold text-lg">高波动无趋势</h3>
+                                <span class="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full">噪声策略识别</span>
+                            </div>
+                            <p class="text-sm text-gray-600">指标正负剧烈波动、无明确方向性。说明策略本身可能是<strong>噪声</strong>，没有稳定效果，建议下线。</p>
+                        </div>
+                        <div class="shrink-0 w-20 h-20 bg-blue-50 rounded-xl flex flex-col items-center justify-center">
+                            <i class="fa fa-random text-2xl text-blue-500"></i>
+                            <span class="text-xs text-blue-600 mt-1">高波动</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- L6 -->
+                <div class="relative bg-white rounded-2xl shadow-lg p-5 pl-6 card-hover glow-border">
+                    <div class="level-dot bg-purple-500">L6</div>
+                    <div class="flex flex-col md:flex-row md:items-start gap-4">
+                        <div class="flex-1">
+                            <div class="flex items-center gap-2 mb-2">
+                                <h3 class="font-bold text-lg">兜底规则</h3>
+                                <span class="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full">继续观察</span>
+                            </div>
+                            <p class="text-sm text-gray-600">以上层级均未命中时的兜底策略。数据不符合任何明确的下线条件，<strong>继续观察</strong>等待更多数据。</p>
+                        </div>
+                        <div class="shrink-0 w-20 h-20 bg-purple-50 rounded-xl flex flex-col items-center justify-center">
+                            <i class="fa fa-eye text-2xl text-purple-500"></i>
+                            <span class="text-xs text-purple-600 mt-1">观察</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Bad Cases -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">Bad Case 驱动迭代</h2>
+                <p class="text-gray-500 mt-2">从 68% 到 80%+ 准确率的关键闭环</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 gap-6 mb-6">
+                <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                    <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naLQLqYDblBuNLRt4H3CliarDtw5ALe4kZQMCm0zp0ZIlNvxbHXNbpY4FQ4zvBsDrTa5xuNJABwOUqw/640?wx_fmt=png&from=appmsg"
+                         alt="Bad Cases 统计" class="rounded-xl img-zoom w-full mb-2">
+                    <p class="text-center text-sm text-gray-500">▲ Bad Cases 统计与分类</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                    <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naLQLqYDblBuNLRt4H3CliarD18OWEs0dpzG71S1tAUONyXDwiafyGoTwFLHnlILOJDEiaw0yde4JxgkQ/640?wx_fmt=png&from=appmsg"
+                         alt="Bad Case 价值" class="rounded-xl img-zoom w-full mb-2">
+                    <p class="text-center text-sm text-gray-500">▲ Bad Case 的价值闭环</p>
+                </div>
+            </div>
+
+            <div class="space-y-4">
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="w-7 h-7 bg-red-500 text-white rounded-lg flex items-center justify-center text-xs font-bold">1</span>
+                        <h3 class="font-bold">日期未排序导致逻辑混乱</h3>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4 text-sm">
+                        <div class="bg-red-50 p-3 rounded-lg">
+                            <p class="text-red-700 font-medium mb-1"><i class="fa fa-bug mr-1"></i> 问题</p>
+                            <p class="text-red-600">输入数据日期无序，模型误判时间趋势方向</p>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg">
+                            <p class="text-green-700 font-medium mb-1"><i class="fa fa-wrench mr-1"></i> 修复</p>
+                            <p class="text-green-600">在 Prompt 中增加显式排序要求，确保按时间顺序分析</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="w-7 h-7 bg-orange-500 text-white rounded-lg flex items-center justify-center text-xs font-bold">2</span>
+                        <h3 class="font-bold">符号误判与连续性判断混淆</h3>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4 text-sm">
+                        <div class="bg-red-50 p-3 rounded-lg">
+                            <p class="text-red-700 font-medium mb-1"><i class="fa fa-bug mr-1"></i> 问题</p>
+                            <p class="text-red-600">模型将微小正值误判为"正向"，或将非连续负值视为"连续负向"</p>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg">
+                            <p class="text-green-700 font-medium mb-1"><i class="fa fa-wrench mr-1"></i> 修复</p>
+                            <p class="text-green-600">增加阈值定义和"连续"的精确量化标准</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                    <div class="flex items-center gap-2 mb-3">
+                        <span class="w-7 h-7 bg-yellow-500 text-white rounded-lg flex items-center justify-center text-xs font-bold">3</span>
+                        <h3 class="font-bold">累积收益与短期波动的权衡</h3>
+                    </div>
+                    <div class="grid md:grid-cols-2 gap-4 text-sm">
+                        <div class="bg-red-50 p-3 rounded-lg">
+                            <p class="text-red-700 font-medium mb-1"><i class="fa fa-bug mr-1"></i> 问题</p>
+                            <p class="text-red-600">策略累积收益为正但近期波动下行，模型过早建议下线</p>
+                        </div>
+                        <div class="bg-green-50 p-3 rounded-lg">
+                            <p class="text-green-700 font-medium mb-1"><i class="fa fa-wrench mr-1"></i> 修复</p>
+                            <p class="text-green-600">引入全局检查机制，综合考量累积收益与短期趋势</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 五大原则 -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">生产级 Prompt 五大原则</h2>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-lg p-4 card-hover mb-6">
+                <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naLQLqYDblBuNLRt4H3CliarDCz9WfSDkFpPVbloyoTfEFZ8fHxAj4BQfyyt9Co4V3VkBuByrx38Hbw/640?wx_fmt=png&from=appmsg"
+                     alt="五大原则" class="rounded-xl img-zoom w-full mb-2">
+                <p class="text-center text-sm text-gray-500">▲ 生产级 Prompt 五大设计原则</p>
+            </div>
+
+            <div class="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div class="bg-white rounded-2xl shadow-lg p-5 card-hover border-t-4 border-sky-500">
+                    <div class="text-2xl mb-3">1️⃣</div>
+                    <h3 class="font-bold mb-2">显式优于隐式</h3>
+                    <p class="text-sm text-gray-600">消除模型的"创意空间"，所有判断标准、阈值、输出格式都必须<strong>明确写出</strong>，不留任何歧义。</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-5 card-hover border-t-4 border-indigo-500">
+                    <div class="text-2xl mb-3">2️⃣</div>
+                    <h3 class="font-bold mb-2">分层而非平铺</h3>
+                    <p class="text-sm text-gray-600">用<strong>优先级分层</strong>保证决策秩序，高风险场景先判断，避免低优先级规则覆盖关键信号。</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-5 card-hover border-t-4 border-purple-500">
+                    <div class="text-2xl mb-3">3️⃣</div>
+                    <h3 class="font-bold mb-2">排除条件保精准率</h3>
+                    <p class="text-sm text-gray-600">不仅定义"什么时候触发"，还要定义<strong>"什么时候不触发"</strong>。排除条件防止误报。</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-5 card-hover border-t-4 border-pink-500">
+                    <div class="text-2xl mb-3">4️⃣</div>
+                    <h3 class="font-bold mb-2">全局检查 > 局部</h3>
+                    <p class="text-sm text-gray-600">先看全局（累积收益、整体趋势），再看局部（近几日数据）。<strong>防止局部波动引起误判</strong>。</p>
+                </div>
+                <div class="bg-white rounded-2xl shadow-lg p-5 card-hover border-t-4 border-amber-500">
+                    <div class="text-2xl mb-3">5️⃣</div>
+                    <h3 class="font-bold mb-2">可解释性是基石</h3>
+                    <p class="text-sm text-gray-600">每个决策都要求模型输出<strong>推理依据</strong>，不仅便于人工复核，更是长期迭代的基础。</p>
+                </div>
+            </div>
+        </section>
+
+        <!-- Prompt 迭代方法论 -->
+        <section>
+            <div class="bg-white rounded-2xl shadow-lg p-6 card-hover">
+                <h2 class="text-2xl font-bold mb-4 text-center"><i class="fa fa-repeat mr-2 text-indigo-500"></i>Prompt 迭代方法论</h2>
+                <div class="grid md:grid-cols-2 gap-6 items-center">
+                    <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naLQLqYDblBuNLRt4H3CliarD9FGRPxlvaTkibCdiacBr0wX9Ae8WiaI0J1WprwEdc9N5pMz1UzAq3MutA/640?wx_fmt=png&from=appmsg"
+                         alt="迭代方法论" class="rounded-xl shadow img-zoom w-full">
+                    <div class="space-y-3">
+                        <div class="flex items-start gap-3">
+                            <span class="w-8 h-8 bg-sky-500 text-white rounded-lg flex items-center justify-center text-sm font-bold shrink-0">1</span>
+                            <div>
+                                <p class="font-medium">收集 Bad Cases</p>
+                                <p class="text-sm text-gray-500">标注每个误判的根因类型</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="w-8 h-8 bg-indigo-500 text-white rounded-lg flex items-center justify-center text-sm font-bold shrink-0">2</span>
+                            <div>
+                                <p class="font-medium">归类与归因</p>
+                                <p class="text-sm text-gray-500">分析是规则缺失、阈值偏差还是逻辑漏洞</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="w-8 h-8 bg-purple-500 text-white rounded-lg flex items-center justify-center text-sm font-bold shrink-0">3</span>
+                            <div>
+                                <p class="font-medium">针对性修改 Prompt</p>
+                                <p class="text-sm text-gray-500">精准修改对应层级的规则或条件</p>
+                            </div>
+                        </div>
+                        <div class="flex items-start gap-3">
+                            <span class="w-8 h-8 bg-pink-500 text-white rounded-lg flex items-center justify-center text-sm font-bold shrink-0">4</span>
+                            <div>
+                                <p class="font-medium">回归测试</p>
+                                <p class="text-sm text-gray-500">确认修复不引入新误判，准确率持续提升</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- 实战成果 -->
+        <section>
+            <div class="text-center mb-10">
+                <h2 class="text-3xl font-black gradient-text inline-block">实战成果</h2>
+            </div>
+
+            <div class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                <div class="bg-gradient-to-br from-sky-50 to-indigo-50 border border-sky-200 rounded-2xl p-6 text-center card-hover">
+                    <div class="text-3xl font-black text-sky-600 mb-1">300+</div>
+                    <div class="text-lg font-bold text-sky-500">→ 100+</div>
+                    <p class="text-xs text-gray-600 mt-2">策略下线数大幅下降</p>
+                </div>
+                <div class="bg-gradient-to-br from-indigo-50 to-purple-50 border border-indigo-200 rounded-2xl p-6 text-center card-hover">
+                    <div class="text-3xl font-black text-indigo-600 mb-1">6h</div>
+                    <div class="text-lg font-bold text-indigo-500">→ 30min</div>
+                    <p class="text-xs text-gray-600 mt-2">每日人工巡检耗时</p>
+                </div>
+                <div class="bg-gradient-to-br from-purple-50 to-pink-50 border border-purple-200 rounded-2xl p-6 text-center card-hover">
+                    <div class="text-3xl font-black text-purple-600 mb-1">68%</div>
+                    <div class="text-lg font-bold text-purple-500">→ 80%+</div>
+                    <p class="text-xs text-gray-600 mt-2">下线准确率持续提升</p>
+                </div>
+                <div class="bg-gradient-to-br from-pink-50 to-orange-50 border border-pink-200 rounded-2xl p-6 text-center card-hover">
+                    <div class="text-3xl font-black text-pink-600 mb-1">30+</div>
+                    <div class="text-lg font-bold text-pink-500">Bad Cases</div>
+                    <p class="text-xs text-gray-600 mt-2">累积分析案例驱动迭代</p>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-2xl shadow-lg p-4 card-hover">
+                <img src="https://mmbiz.qpic.cn/mmbiz_png/Z6bicxIx5naL9Dr7oLH85FMDI7ImRYhdPhdjTxCRGSibJVXPR5ibjL8u7C70s6j6vMoZn7HBouMBtz6UhhGRGLy6g/640?wx_fmt=png&from=appmsg"
+                     alt="大模型适合的任务" class="rounded-xl img-zoom w-full mb-2">
+                <p class="text-center text-sm text-gray-500">▲ 大模型适合的任务类型</p>
+            </div>
+        </section>
+
+        <!-- 核心结论 -->
+        <section>
+            <div class="bg-gradient-to-br from-sky-600 via-indigo-600 to-purple-700 rounded-2xl shadow-xl p-8 text-white">
+                <div class="text-center mb-6">
+                    <div class="text-3xl mb-3">💡</div>
+                    <h2 class="text-2xl font-black">核心启示</h2>
+                </div>
+                <div class="max-w-3xl mx-auto space-y-4">
+                    <blockquote class="text-xl text-center leading-relaxed font-medium mb-6">
+                        生产级 Prompt 不是"写提示词"，<br>而是<span class="text-yellow-300 font-black">构建一套可维护的决策系统</span>
+                    </blockquote>
+                    <div class="grid md:grid-cols-3 gap-4">
+                        <div class="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
+                            <i class="fa fa-sitemap text-2xl mb-2"></i>
+                            <p class="font-bold mb-1">分层设计</p>
+                            <p class="text-sm text-white/80">优先级决策树比扁平规则更可靠</p>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
+                            <i class="fa fa-bug text-2xl mb-2"></i>
+                            <p class="font-bold mb-1">Bad Case 闭环</p>
+                            <p class="text-sm text-white/80">每个误判都是 Prompt 进化的养分</p>
+                        </div>
+                        <div class="bg-white/10 backdrop-blur rounded-xl p-4 text-center">
+                            <i class="fa fa-eye text-2xl mb-2"></i>
+                            <p class="font-bold mb-1">可解释性</p>
+                            <p class="text-sm text-white/80">不可解释的自动化无法长期运行</p>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer -->
+    <footer class="bg-gray-900 text-gray-400 py-8 mt-16">
+        <div class="max-w-5xl mx-auto px-6 text-center text-sm">
+            <p>内容来源：阿里云开发者 · 码影（张超）</p>
+            <p class="mt-1 text-gray-600">本页面仅为文章内容的结构化总结</p>
+        </div>
+    </footer>
+
+</body>
+</html>

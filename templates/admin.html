@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>行程管理后台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-indigo-600 text-white px-6 py-3 flex items-center justify-between shadow">
+        <div class="flex items-center gap-4">
+            <a href="{{ url_for('index') }}" class="text-lg font-bold hover:text-indigo-200 transition">📋 提醒管理</a>
+            <a href="{{ url_for('admin') }}" class="text-white text-sm font-medium">行程管理</a>
+            <a href="{{ url_for('admin_daily') }}" class="text-indigo-200 hover:text-white text-sm">每日任务</a>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('admin_new') }}" class="bg-white text-indigo-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-50 transition">
+                <i class="fa fa-plus"></i> 新建
+            </a>
+            <a href="{{ url_for('admin_logout') }}" class="text-indigo-200 hover:text-white text-xs" title="退出登录">
+                <i class="fa fa-sign-out"></i>
+            </a>
+        </div>
+    </nav>
+
+    <div class="flex max-w-7xl mx-auto mt-6 gap-6 px-4 pb-8">
+        <!-- 左侧 -->
+        <div class="w-80 shrink-0 space-y-4">
+            <!-- 微信机器人状态 -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden" x-data="botPanel()">
+                <div class="px-4 py-3 bg-gray-50 border-b font-medium text-gray-700 text-sm flex items-center justify-between">
+                    <span>🤖 微信机器人</span>
+                    <span class="flex items-center gap-1.5 text-xs"
+                          :class="botStatus.logged_in ? 'text-green-600' : 'text-gray-400'">
+                        <span class="w-2 h-2 rounded-full" :class="botStatus.logged_in ? 'bg-green-500' : 'bg-gray-300'"></span>
+                        <span x-text="botStatus.logged_in ? '已连接' : '未连接'"></span>
+                    </span>
+                </div>
+                <div class="p-4 space-y-3">
+                    <!-- 未登录 -->
+                    <template x-if="!botStatus.logged_in">
+                        <div class="space-y-3">
+                            <a :href="botStatus.login_url" target="_blank"
+                               class="block w-full bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition text-center">
+                                <i class="fa fa-wechat"></i> 扫码登录微信
+                            </a>
+                            <p class="text-xs text-gray-400 text-center">点击后在新窗口扫码，扫完回来刷新</p>
+                        </div>
+                    </template>
+
+                    <!-- 已登录 -->
+                    <template x-if="botStatus.logged_in">
+                        <div class="space-y-3">
+                            <div>
+                                <label class="block text-xs font-medium text-gray-500 mb-1">推送目标群（填写群名）</label>
+                                <div class="flex gap-2">
+                                    <input type="text" x-model="selectedGroup" placeholder="输入微信群名称"
+                                           class="flex-1 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500">
+                                    <button @click="setGroup()"
+                                            class="bg-indigo-600 text-white px-3 py-1.5 rounded-lg text-xs hover:bg-indigo-700 transition">
+                                        确定
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <button @click="testSend()"
+                                        class="flex-1 bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-lg text-xs hover:bg-indigo-200 transition"
+                                        :disabled="!selectedGroup">
+                                    <i class="fa fa-paper-plane"></i> 测试推送
+                                </button>
+                            </div>
+                            <div x-show="botMsg" x-cloak class="text-xs px-2 py-1 rounded"
+                                 :class="botMsgOk ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'"
+                                 x-text="botMsg"></div>
+
+                            <div class="text-xs text-gray-400 bg-gray-50 rounded-lg p-3 leading-relaxed">
+                                <p class="font-medium text-gray-500 mb-1">💬 群内指令</p>
+                                <p>• 回复「打卡 1」完成行程第1项</p>
+                                <p>• 回复「查看行程」查看安排</p>
+                                <p>• 回复「打卡进度」查看进度</p>
+                                <p class="mt-1.5 font-medium text-gray-500">📝 每日任务</p>
+                                <p>• 回复「每日打卡 1」完成第1项</p>
+                                <p>• 回复「每日进度」查看今日进度</p>
+                            </div>
+                        </div>
+                    </template>
+                </div>
+            </div>
+
+            <!-- 行程列表 -->
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="px-4 py-3 bg-gray-50 border-b font-medium text-gray-700 text-sm">全部行程</div>
+                {% if trips %}
+                {% for t in trips %}
+                <a href="{{ url_for('admin_edit', trip_id=t['id']) }}"
+                   class="block px-4 py-3 border-b hover:bg-indigo-50 transition {% if editing == 'edit' and trip and trip['id'] == t['id'] %}bg-indigo-50 border-l-4 border-l-indigo-500{% endif %}">
+                    <div class="font-medium text-gray-800 text-sm">{{ t['title'] }}</div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        📅 {{ t['trip_date'] }}
+                        {% if t['time_start'] %} · {{ t['time_start'] }}{% endif %}
+                    </div>
+                </a>
+                {% endfor %}
+                {% else %}
+                <div class="px-4 py-8 text-center text-gray-400 text-sm">暂无行程</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 右侧编辑区 -->
+        <div class="flex-1 min-w-0">
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
+                {{ messages[0] }}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% if editing %}
+            <div class="bg-white rounded-xl shadow-sm p-6" x-data="tripForm()">
+                <h2 class="text-lg font-bold text-gray-800 mb-6">
+                    {% if editing == 'new' %}新建行程{% else %}编辑行程{% endif %}
+                </h2>
+
+                <form method="POST" action="{{ url_for('admin_save') }}">
+                    {% if editing == 'edit' and trip %}
+                    <input type="hidden" name="trip_id" value="{{ trip['id'] }}">
+                    {% endif %}
+                    <input type="hidden" name="mode" :value="mode">
+
+                    <!-- 模式切换 -->
+                    <div class="flex gap-2 mb-6 border-b pb-4">
+                        <button type="button" @click="mode = 'structured'"
+                                :class="mode === 'structured' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                                class="px-4 py-2 rounded-lg text-sm font-medium transition">
+                            📅 行程模式
+                        </button>
+                        <button type="button" @click="mode = 'freeform'"
+                                :class="mode === 'freeform' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'"
+                                class="px-4 py-2 rounded-lg text-sm font-medium transition">
+                            ✏️ 自由编辑
+                        </button>
+                    </div>
+
+                    <!-- 共用：标题 + 日期 -->
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div class="col-span-2">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">标题 *</label>
+                            <input type="text" name="title" required
+                                   value="{{ trip['title'] if editing == 'edit' else '' }}"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                   placeholder="例如：出发去香港 / 本周学习安排">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">日期 *</label>
+                            <input type="date" name="trip_date" required
+                                   value="{{ trip['trip_date'] if editing == 'edit' else '' }}"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div class="flex gap-2" x-show="mode === 'structured'">
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">开始时间</label>
+                                <input type="time" name="time_start"
+                                       value="{{ trip['time_start'] if editing == 'edit' and trip['time_start'] else '' }}"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                            <div class="flex-1">
+                                <label class="block text-sm font-medium text-gray-700 mb-1">结束时间</label>
+                                <input type="time" name="time_end"
+                                       value="{{ trip['time_end'] if editing == 'edit' and trip['time_end'] else '' }}"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 自由编辑：消息内容 -->
+                    <div x-show="mode === 'freeform'" x-cloak class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">消息内容</label>
+                        <textarea name="custom_content" rows="10"
+                                  class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono leading-relaxed"
+                                  placeholder="直接编写要发送到微信群的消息内容...&#10;&#10;支持 emoji 表情，换行会保留。&#10;例如：&#10;📢 通知&#10;━━━━━━━━━━&#10;明天上午 9 点在会议室集合...">{{ trip['custom_content'] if editing == 'edit' and trip['custom_content'] else '' }}</textarea>
+                        <p class="text-xs text-gray-400 mt-1">直接编写消息内容，发送到群里的格式与此处完全一致</p>
+                    </div>
+
+                    <!-- 行程模式：结构化字段 -->
+                    <div x-show="mode === 'structured'" x-cloak>
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">出发地</label>
+                                <input type="text" name="location_from"
+                                       value="{{ trip['location_from'] if editing == 'edit' and trip['location_from'] else '' }}"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="例如：上海机场">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">目的地</label>
+                                <input type="text" name="location_to"
+                                       value="{{ trip['location_to'] if editing == 'edit' and trip['location_to'] else '' }}"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="例如：香港">
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-2 gap-4 mb-6">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">同行人员</label>
+                                <input type="text" name="personnel"
+                                       value="{{ trip['personnel'] if editing == 'edit' and trip['personnel'] else '' }}"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="例如：Olga、韩幸好">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">天气信息</label>
+                                <input type="text" name="weather"
+                                       value="{{ trip['weather'] if editing == 'edit' and trip['weather'] else '' }}"
+                                       class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="例如：26-31°C，多云有阵雨">
+                            </div>
+                        </div>
+
+                        <div class="mb-6">
+                            <label class="block text-sm font-medium text-gray-700 mb-1">备注（每行一条）</label>
+                            <textarea name="notes" rows="2"
+                                      class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                      placeholder="例如：建议带伞，香港室内冷气强带件薄外套">{{ trip['notes'] if editing == 'edit' and trip['notes'] else '' }}</textarea>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">⚠️ 准备检查清单</label>
+                        <template x-for="(item, index) in checklistItems" :key="index">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-gray-400 text-sm" x-text="index + 1 + '.'"></span>
+                                <input type="text" :name="'cl_content[]'" x-model="item.content"
+                                       class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="检查项内容">
+                                <button type="button" @click="removeChecklist(index)"
+                                        class="text-red-400 hover:text-red-600 text-sm px-2">
+                                    <i class="fa fa-trash-o"></i>
+                                </button>
+                            </div>
+                        </template>
+                        <button type="button" @click="addChecklist()"
+                                class="text-indigo-600 hover:text-indigo-800 text-sm mt-1">
+                            <i class="fa fa-plus"></i> 添加检查项
+                        </button>
+                    </div>
+
+                    <div class="mb-6" x-show="mode === 'structured'" x-cloak>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">📅 本周后续安排</label>
+                        <template x-for="(ev, index) in weeklyEvents" :key="index">
+                            <div class="flex items-center gap-2 mb-2">
+                                <input type="date" :name="'ev_date[]'" x-model="ev.date"
+                                       class="w-32 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <input type="time" :name="'ev_time[]'" x-model="ev.time"
+                                       class="w-28 border border-gray-300 rounded-lg px-2 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <input type="text" :name="'ev_title[]'" x-model="ev.title"
+                                       class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="事件标题">
+                                <input type="text" :name="'ev_note[]'" x-model="ev.note"
+                                       class="w-40 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="备注">
+                                <button type="button" @click="removeEvent(index)"
+                                        class="text-red-400 hover:text-red-600 text-sm px-2">
+                                    <i class="fa fa-trash-o"></i>
+                                </button>
+                            </div>
+                        </template>
+                        <button type="button" @click="addEvent()"
+                                class="text-indigo-600 hover:text-indigo-800 text-sm mt-1">
+                            <i class="fa fa-plus"></i> 添加后续安排
+                        </button>
+                    </div>
+
+                    <div class="mb-6 bg-gray-50 rounded-lg p-4">
+                        <label class="block text-sm font-medium text-gray-700 mb-3">🔔 提醒设置</label>
+                        <div class="flex items-center gap-6">
+                            <label class="flex items-center gap-2 text-sm text-gray-600">
+                                <input type="checkbox" name="remind_evening" value="1"
+                                       {% if editing == 'new' or (editing == 'edit' and trip['remind_evening']) %}checked{% endif %}
+                                       class="rounded text-indigo-600 focus:ring-indigo-500">
+                                前一天晚上 21:00 + 当天早上 8:00 提醒
+                            </label>
+                            <div class="flex items-center gap-2 text-sm text-gray-600">
+                                <span>出发前</span>
+                                <input type="number" name="remind_before_min" min="5" max="180"
+                                       value="{{ trip['remind_before_min'] if editing == 'edit' else 60 }}"
+                                       class="w-20 border border-gray-300 rounded-lg px-2 py-1 text-sm text-center focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                                <span>分钟提醒</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-4 border-t">
+                        <button type="submit"
+                                class="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                            <i class="fa fa-save"></i> 保存
+                        </button>
+
+                        {% if editing == 'edit' and trip %}
+                        <button type="button" @click="previewMessage({{ trip['id'] }})"
+                                class="bg-gray-100 text-gray-700 px-4 py-2 rounded-lg text-sm hover:bg-gray-200 transition">
+                            <i class="fa fa-eye"></i> 预览消息
+                        </button>
+                        <button type="button" @click="sendMessage({{ trip['id'] }})"
+                                class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition">
+                            <i class="fa fa-wechat"></i> 推送到群
+                        </button>
+                        {% endif %}
+
+                        <a href="{{ url_for('admin') }}"
+                           class="text-gray-500 hover:text-gray-700 text-sm ml-auto">取消</a>
+
+                        {% if editing == 'edit' and trip %}
+                        <form method="POST" action="{{ url_for('admin_delete', trip_id=trip['id']) }}"
+                              onsubmit="return confirm('确定取消此行程？')" class="inline">
+                            <button type="submit" class="text-red-500 hover:text-red-700 text-sm">
+                                <i class="fa fa-trash"></i> 删除
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </form>
+
+                <!-- 预览弹窗 -->
+                <div x-show="showPreview" x-cloak
+                     class="fixed inset-0 bg-black/50 flex items-center justify-center z-50"
+                     @click.self="showPreview = false">
+                    <div class="bg-gray-900 text-gray-100 rounded-2xl p-6 max-w-lg w-full mx-4 shadow-2xl">
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="font-medium">消息预览（群内显示效果）</h3>
+                            <button @click="showPreview = false" class="text-gray-400 hover:text-white">
+                                <i class="fa fa-times"></i>
+                            </button>
+                        </div>
+                        <pre class="whitespace-pre-wrap text-sm leading-relaxed font-sans" x-text="previewText"></pre>
+                    </div>
+                </div>
+
+                <!-- 推送结果提示 -->
+                <div x-show="sendResult" x-cloak
+                     :class="sendResultOk ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'"
+                     class="fixed top-4 right-4 border px-4 py-3 rounded-lg shadow-lg z-50 text-sm"
+                     x-text="sendResult"
+                     x-init="$watch('sendResult', v => { if(v) setTimeout(() => sendResult = '', 3000) })">
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-white rounded-xl shadow-sm p-12 text-center">
+                <div class="text-6xl mb-4">📋</div>
+                <h2 class="text-xl font-bold text-gray-700 mb-2">行程提醒管理系统</h2>
+                <p class="text-gray-500 mb-6">选择左侧行程编辑，或创建新的行程安排</p>
+                <a href="{{ url_for('admin_new') }}"
+                   class="inline-block bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                    <i class="fa fa-plus"></i> 新建行程
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function botPanel() {
+        return {
+            botStatus: { logged_in: false, target_group: null, login_url: '' },
+            selectedGroup: '',
+            botMsg: '',
+            botMsgOk: false,
+            pollTimer: null,
+
+            init() {
+                this.checkStatus();
+                this.pollTimer = setInterval(() => this.checkStatus(), 5000);
+            },
+
+            destroy() {
+                if (this.pollTimer) clearInterval(this.pollTimer);
+            },
+
+            async checkStatus() {
+                try {
+                    const res = await fetch('/api/bot/status');
+                    const data = await res.json();
+                    this.botStatus = data;
+                    if (data.target_group && !this.selectedGroup) {
+                        this.selectedGroup = data.target_group;
+                    }
+                } catch(e) {}
+            },
+
+            async setGroup() {
+                if (!this.selectedGroup) return;
+                const res = await fetch('/api/bot/set-group', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ group_name: this.selectedGroup })
+                });
+                this.botMsg = `已设置推送群：${this.selectedGroup}`;
+                this.botMsgOk = true;
+                setTimeout(() => this.botMsg = '', 2000);
+            },
+
+            async testSend() {
+                const res = await fetch('/api/bot/test-send', { method: 'POST' });
+                const data = await res.json();
+                this.botMsgOk = data.status === 'success';
+                this.botMsg = data.status === 'success' ? '测试消息已发送到群' : '发送失败：' + (data.reason || '未知错误');
+                setTimeout(() => this.botMsg = '', 3000);
+            }
+        }
+    }
+
+    function tripForm() {
+        return {
+            mode: '{{ trip["mode"] if editing == "edit" and trip["mode"] else "structured" }}',
+            checklistItems: [
+                {% if editing == 'edit' and checklist %}
+                {% for item in checklist %}
+                { content: {{ item['content'] | tojson }} },
+                {% endfor %}
+                {% else %}
+                { content: '' },
+                {% endif %}
+            ],
+            weeklyEvents: [
+                {% if editing == 'edit' and events %}
+                {% for ev in events %}
+                { date: {{ ev['event_date'] | tojson }}, time: {{ (ev['event_time'] or '') | tojson }}, title: {{ ev['event_title'] | tojson }}, note: {{ (ev['event_note'] or '') | tojson }} },
+                {% endfor %}
+                {% else %}
+                { date: '', time: '', title: '', note: '' },
+                {% endif %}
+            ],
+            showPreview: false,
+            previewText: '',
+            sendResult: '',
+            sendResultOk: false,
+
+            addChecklist() { this.checklistItems.push({ content: '' }); },
+            removeChecklist(i) { if (this.checklistItems.length > 1) this.checklistItems.splice(i, 1); },
+            addEvent() { this.weeklyEvents.push({ date: '', time: '', title: '', note: '' }); },
+            removeEvent(i) { if (this.weeklyEvents.length > 1) this.weeklyEvents.splice(i, 1); },
+
+            async previewMessage(tripId) {
+                const res = await fetch(`/api/trip/${tripId}/preview`);
+                const data = await res.json();
+                this.previewText = data.message;
+                this.showPreview = true;
+            },
+
+            async sendMessage(tripId) {
+                if (!confirm('确定推送此消息到微信群？')) return;
+                const res = await fetch(`/api/trip/${tripId}/send`, { method: 'POST' });
+                const data = await res.json();
+                this.sendResultOk = data.status === 'success';
+                this.sendResult = data.status === 'success' ? '✅ 推送成功'
+                    : data.status === 'error' ? '❌ ' + (data.reason || '推送失败')
+                    : '❌ 推送失败';
+            }
+        }
+    }
+    </script>
+</body>
+</html>

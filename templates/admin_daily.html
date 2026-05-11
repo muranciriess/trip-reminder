@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>每日任务管理</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css">
+    <style>
+        [x-cloak] { display: none !important; }
+    </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+    <nav class="bg-indigo-600 text-white px-6 py-3 flex items-center justify-between shadow">
+        <div class="flex items-center gap-4">
+            <a href="{{ url_for('index') }}" class="text-lg font-bold hover:text-indigo-200 transition">📋 提醒管理</a>
+            <a href="{{ url_for('admin') }}" class="text-indigo-200 hover:text-white text-sm">行程管理</a>
+            <a href="{{ url_for('admin_daily') }}" class="text-white text-sm font-medium">每日任务</a>
+        </div>
+        <div class="flex items-center gap-3">
+            <a href="{{ url_for('admin_daily_new') }}" class="bg-white text-indigo-600 px-4 py-1.5 rounded-lg text-sm font-medium hover:bg-indigo-50 transition">
+                <i class="fa fa-plus"></i> 新建
+            </a>
+            <a href="{{ url_for('admin_logout') }}" class="text-indigo-200 hover:text-white text-xs" title="退出登录">
+                <i class="fa fa-sign-out"></i>
+            </a>
+        </div>
+    </nav>
+
+    <div class="flex max-w-7xl mx-auto mt-6 gap-6 px-4 pb-8">
+        <!-- 左侧任务列表 -->
+        <div class="w-80 shrink-0 space-y-4">
+            <div class="bg-white rounded-xl shadow-sm overflow-hidden">
+                <div class="px-4 py-3 bg-gray-50 border-b font-medium text-gray-700 text-sm">全部每日任务</div>
+                {% if task_data %}
+                {% for td in task_data %}
+                <a href="{{ url_for('admin_daily_edit', task_id=td.task['id']) }}"
+                   class="block px-4 py-3 border-b hover:bg-indigo-50 transition {% if editing == 'edit' and task and task['id'] == td.task['id'] %}bg-indigo-50 border-l-4 border-l-indigo-500{% endif %}">
+                    <div class="flex items-center justify-between">
+                        <div class="font-medium text-gray-800 text-sm">{{ td.task['title'] }}</div>
+                        <span class="text-xs px-1.5 py-0.5 rounded {{ 'bg-green-100 text-green-700' if td.task['active'] else 'bg-gray-100 text-gray-400' }}">
+                            {{ '启用' if td.task['active'] else '停用' }}
+                        </span>
+                    </div>
+                    <div class="text-xs text-gray-500 mt-1">
+                        ⏰ 每日 {{ td.task['remind_time'] }} 提醒 · {{ td.items | length }} 个任务项
+                    </div>
+                </a>
+                {% endfor %}
+                {% else %}
+                <div class="px-4 py-8 text-center text-gray-400 text-sm">暂无每日任务</div>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- 右侧编辑区 -->
+        <div class="flex-1 min-w-0">
+            {% with messages = get_flashed_messages() %}
+            {% if messages %}
+            <div class="mb-4 bg-green-50 border border-green-200 text-green-700 px-4 py-2 rounded-lg text-sm">
+                {{ messages[0] }}
+            </div>
+            {% endif %}
+            {% endwith %}
+
+            {% if editing %}
+            <div class="bg-white rounded-xl shadow-sm p-6" x-data="dailyForm()">
+                <h2 class="text-lg font-bold text-gray-800 mb-6">
+                    {% if editing == 'new' %}新建每日任务{% else %}编辑每日任务{% endif %}
+                </h2>
+
+                <form method="POST" action="{{ url_for('admin_daily_save') }}">
+                    {% if editing == 'edit' and task %}
+                    <input type="hidden" name="task_id" value="{{ task['id'] }}">
+                    {% endif %}
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-1">任务标题 *</label>
+                        <input type="text" name="title" required
+                               value="{{ task['title'] if editing == 'edit' else '' }}"
+                               class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                               placeholder="例如：每日学习任务">
+                    </div>
+
+                    <div class="grid grid-cols-2 gap-4 mb-6">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-1">⏰ 每日提醒时间</label>
+                            <input type="time" name="remind_time"
+                                   value="{{ task['remind_time'] if editing == 'edit' else '09:00' }}"
+                                   class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500">
+                        </div>
+                        <div class="flex items-end pb-1">
+                            <label class="flex items-center gap-2 text-sm text-gray-600">
+                                <input type="checkbox" name="active" value="1"
+                                       {% if editing == 'new' or (editing == 'edit' and task['active']) %}checked{% endif %}
+                                       class="rounded text-indigo-600 focus:ring-indigo-500">
+                                启用每日提醒
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="mb-6">
+                        <label class="block text-sm font-medium text-gray-700 mb-2">📝 任务项目</label>
+                        <template x-for="(item, index) in taskItems" :key="index">
+                            <div class="flex items-center gap-2 mb-2">
+                                <span class="text-gray-400 text-sm" x-text="index + 1 + '.'"></span>
+                                <input type="text" name="item_content[]" x-model="item.content"
+                                       class="flex-1 border border-gray-300 rounded-lg px-3 py-1.5 text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                                       placeholder="任务内容，例如：背单词 30 分钟">
+                                <button type="button" @click="removeItem(index)"
+                                        class="text-red-400 hover:text-red-600 text-sm px-2">
+                                    <i class="fa fa-trash-o"></i>
+                                </button>
+                            </div>
+                        </template>
+                        <button type="button" @click="addItem()"
+                                class="text-indigo-600 hover:text-indigo-800 text-sm mt-1">
+                            <i class="fa fa-plus"></i> 添加任务项
+                        </button>
+                    </div>
+
+                    <div class="bg-gray-50 rounded-lg p-4 mb-6 text-xs text-gray-500 leading-relaxed">
+                        <p class="font-medium text-gray-600 mb-1">💡 说明</p>
+                        <p>• 系统每天在设定时间自动推送任务列表到微信群</p>
+                        <p>• 学员在群内回复「每日打卡 1」即可完成第 1 项任务</p>
+                        <p>• 回复「每日进度」可查看所有人的打卡进度</p>
+                        <p>• 每天的打卡记录独立计算，次日重置</p>
+                    </div>
+
+                    <div class="flex items-center gap-3 pt-4 border-t">
+                        <button type="submit"
+                                class="bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                            <i class="fa fa-save"></i> 保存
+                        </button>
+
+                        {% if editing == 'edit' and task %}
+                        <button type="button" @click="sendNow({{ task['id'] }})"
+                                class="bg-green-600 text-white px-4 py-2 rounded-lg text-sm hover:bg-green-700 transition">
+                            <i class="fa fa-wechat"></i> 立即推送到群
+                        </button>
+                        {% endif %}
+
+                        <a href="{{ url_for('admin_daily') }}"
+                           class="text-gray-500 hover:text-gray-700 text-sm ml-auto">取消</a>
+
+                        {% if editing == 'edit' and task %}
+                        <form method="POST" action="{{ url_for('admin_daily_delete', task_id=task['id']) }}"
+                              onsubmit="return confirm('确定删除此每日任务？')" class="inline">
+                            <button type="submit" class="text-red-500 hover:text-red-700 text-sm">
+                                <i class="fa fa-trash"></i> 删除
+                            </button>
+                        </form>
+                        {% endif %}
+                    </div>
+                </form>
+
+                <!-- 推送结果提示 -->
+                <div x-show="sendResult" x-cloak
+                     :class="sendResultOk ? 'bg-green-50 border-green-200 text-green-700' : 'bg-red-50 border-red-200 text-red-700'"
+                     class="fixed top-4 right-4 border px-4 py-3 rounded-lg shadow-lg z-50 text-sm"
+                     x-text="sendResult"
+                     x-init="$watch('sendResult', v => { if(v) setTimeout(() => sendResult = '', 3000) })">
+                </div>
+            </div>
+            {% else %}
+            <div class="bg-white rounded-xl shadow-sm p-12 text-center">
+                <div class="text-6xl mb-4">📝</div>
+                <h2 class="text-xl font-bold text-gray-700 mb-2">每日任务管理</h2>
+                <p class="text-gray-500 mb-6">创建每日打卡任务，学员可在微信群内完成打卡</p>
+                <a href="{{ url_for('admin_daily_new') }}"
+                   class="inline-block bg-indigo-600 text-white px-6 py-2 rounded-lg text-sm font-medium hover:bg-indigo-700 transition">
+                    <i class="fa fa-plus"></i> 新建每日任务
+                </a>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+
+    <script>
+    function dailyForm() {
+        return {
+            taskItems: [
+                {% if editing == 'edit' and items %}
+                {% for item in items %}
+                { content: {{ item['content'] | tojson }} },
+                {% endfor %}
+                {% else %}
+                { content: '' },
+                {% endif %}
+            ],
+            sendResult: '',
+            sendResultOk: false,
+
+            addItem() { this.taskItems.push({ content: '' }); },
+            removeItem(i) { if (this.taskItems.length > 1) this.taskItems.splice(i, 1); },
+
+            async sendNow(taskId) {
+                if (!confirm('确定推送每日任务到微信群？')) return;
+                const res = await fetch(`/api/daily/${taskId}/send`, { method: 'POST' });
+                const data = await res.json();
+                this.sendResultOk = data.status === 'success';
+                this.sendResult = data.status === 'success' ? '✅ 推送成功'
+                    : '❌ ' + (data.reason || '推送失败');
+            }
+        }
+    }
+    </script>
+</body>
+</html>
