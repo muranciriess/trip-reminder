@@ -843,6 +843,22 @@ def bot_proxy(path=''):
         return jsonify({'error': str(e)}), 502
 
 
+@app.route('/sse')
+def sse_proxy():
+    """代理微信机器人的 SSE 事件流（扫码登录实时更新）"""
+    bot_url = f"{wechat_bot.BOT_BASE_URL}/sse"
+    try:
+        resp = http_requests.get(bot_url, stream=True, timeout=120)
+
+        def generate():
+            for line in resp.iter_lines(decode_unicode=True):
+                if line is not None:
+                    yield line + '\n'
+
+        return Response(generate(), content_type='text/event-stream',
+                        headers={'Cache-Control': 'no-cache', 'X-Accel-Buffering': 'no'})
+
+
 # ── 微信消息回调（Docker 容器 → Flask） ─────────────────
 
 @app.route('/api/wechat/callback', methods=['POST'])
